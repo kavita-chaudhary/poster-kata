@@ -1,0 +1,6 @@
+random2
+pandas 
+numpy
+fake
+requests
+sqlalchemy
