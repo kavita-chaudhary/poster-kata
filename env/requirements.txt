@@ -1,6 +1,7 @@
 random2
 pandas 
 numpy
-fake
+faker
 requests
 sqlalchemy
+psycopg2
