@@ -1,4 +1,4 @@
-#packgaes for
+# importing libraries
 import json
 import requests
 import pandas as pd
@@ -12,7 +12,7 @@ import psycopg2
 
 
 
-#constant value and link required.
+# defined required constant values/link
 GetURLStar='http://swapi.dev/api/starships/'
 GetURLfilms="http://swapi.dev/api/films/"
 respStarshipList = []
@@ -21,45 +21,45 @@ respFilmsList = []
 filmUrlRegex ="http:\/\/swapi.dev\/api\/films\/(\d+)"
 
 
-##creat schema
-
-postgresConnection = psycopg2.connect(database="dw", user="starship", password="password321", host="localhost", port="5432")
+# creating dw_starwars schema in DataWare database
+postgresConnection = psycopg2.connect(database="dw", user="starship", password="password321", host="db", port="5432")
 print("Database opened successfully")
 cur = postgresConnection.cursor()
 cur.execute('''create schema dw_starwars''')
 postgresConnection.commit()
 
-postgresConnection = psycopg2.connect(database="salesdb", user="starship", password="password321", host="localhost", port="5432")
+# creating sales_db schema in sales database
+postgresConnection = psycopg2.connect(database="salesdb", user="starship", password="password321", host="db", port="5432")
 print("Database opened successfully")
 cur = postgresConnection.cursor()
 cur.execute('''create schema sales_db''')
 postgresConnection.commit()
 
 
-# Call a given link.
-
+# This function is to make HTTP GET requests calls and returing received Response.
 def callAPI(link):
     #print(link)
     response = requests.get(link)
     return response
 
-# method to form starships-films relation List
+# This function is to process given index and film lists as inputs and sets starship-films relation to respective List
 def buildStarShipFilmRelationList(idx,filmList):
     for filmUrl in filmList:
-        #print(filmUrl)
-        x = re.search(filmUrlRegex, filmUrl)
-        if x:
-            #print(x.group(1))
-            ssDict = {"ss_id":idx, "f_id":x.group(1)}
+        filmId = re.search(filmUrlRegex, filmUrl)
+        if filmId:
+            #print(filmId.group(1))
+            ssDict = {"ss_id":idx, "f_id":filmId.group(1)}
             respStarshipAndFilmRelationList.append(ssDict)
-            getFilmsList(x.group(1),filmUrl)
+            getFilmsList(filmId.group(1),filmUrl)
         else:
-            print("No match")
+            print("No Film-Id Found !! ")
 
             
-# method to form films list
+# This function is to process Film API response and add details to films response list
 def getFilmsList(f_id,filmUrl):
+            # invokde GET api to fetch Film details
             film_Response= callAPI(filmUrl)
+            # don't process further if API response is not success
             if(film_Response.status_code != 200):
                 print(film_Response.status_code)
                 pass
@@ -67,10 +67,12 @@ def getFilmsList(f_id,filmUrl):
             filmJsonResponse['f_id']= f_id
             respFilmsList.append(filmJsonResponse)
             
-#starship genration
-x = range(1, 16)
-for i in x:
+# Program Execution : START here
+starshipIds = range(1, 16)
+for i in starshipIds:
+    # invokde GET api to fetch Startship details
     apiResponse = callAPI(GetURLStar + str(i) + "/")
+    # don't process further if API response is not success
     if(apiResponse.status_code != 200):
         print(apiResponse.status_code)
         continue
@@ -81,25 +83,23 @@ for i in x:
     jsonResponse.pop('films',None)
     respStarshipList.append(jsonResponse)
     
-    
- #creation of startship DF
+# Creating StartShip DataFrame
 starShipDF=pd.DataFrame(respStarshipList)
 starShipDF=starShipDF[['ss_id','name', 'model','manufacturer', 'crew','passengers','starship_class']]
 print(starShipDF)
 
-#creation of XREF starshipANDFilm DF
+# Creating XREF StarShip-Film DataFrame
 starshipAndFilmRelDF=pd.DataFrame(respStarshipAndFilmRelationList)
 print(starshipAndFilmRelDF)
 
-#creation of film DF
+# Creating Film DataFrame
 filmsDF=pd.DataFrame(respFilmsList)
 filmsDF=filmsDF[['f_id','title','release_date']].drop_duplicates(['f_id','title','release_date'])
 print(filmsDF)
 
 
-###loading tables dw
-
-engine = sqlalchemy.create_engine("postgresql://starship:password321@localhost/dw")
+# loading tables dw
+engine = sqlalchemy.create_engine("postgresql://starship:password321@db/dw")
 con = engine.connect()
 print(engine.table_names())
 
@@ -110,8 +110,7 @@ table_name3 ='FILMS_DETAILS_T'
 filmsDF.to_sql(table_name3, con ,schema='dw_starwars',if_exists='replace')
 
 
-####salesdb  loading with dummy fake data and creation of starship table
-
+# Salesdb  loading with dummy fake data and creation of starship table
 result=[]
 fake = Faker()
 nrow = 10
@@ -140,7 +139,7 @@ salseDBDF[['poster_content','ss_id']]= starShipDF[['name','ss_id']].sample(n=9)
 
 salseDBDF
 
-engine = sqlalchemy.create_engine("postgresql://starship:password321@localhost/salesdb")
+engine = sqlalchemy.create_engine("postgresql://starship:password321@db/salesdb")
 con = engine.connect()
 table_name1 ='STARSHIP_POSTER_SALES_T'
 salseDBDF.to_sql(table_name1, con ,schema='sales_db',if_exists='replace')
@@ -150,15 +149,15 @@ result = pd.merge(starShipDF, salseDBDF[['quantity','price','promo_code','ss_id'
 del result["poster_content"]
 result
 
-#creation of starship table
-engine = sqlalchemy.create_engine("postgresql://starship:password321@localhost/dw")
+# create StarShip table
+engine = sqlalchemy.create_engine("postgresql://starship:password321@db/dw")
 con = engine.connect()
 table_name = 'STARSHIP_DETAILS_T'
 result.to_sql(table_name, con ,schema='dw_starwars',if_exists='replace')
 
 
-##summarzing the data :
-con = psycopg2.connect(database="dw", user="starship", password="password321", host="localhost", port="5432")
+# Summarizing the data :
+con = psycopg2.connect(database="dw", user="starship", password="password321", host="db", port="5432")
 print("Database opened successfully")
 cur = con.cursor()
 cur.execute('''with cte as (
@@ -169,8 +168,6 @@ group by A.ss_id)
 select A.*,B.titleR from dw_starwars."STARSHIP_DETAILS_T" A
 join cte B on A.ss_id=B.ss_id;''')
 rows = cur.fetchall()
-rows
+print(rows)
 
 
-    
-    

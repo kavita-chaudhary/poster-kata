@@ -2,7 +2,15 @@ version: "3.9"
 services:
   app :
     build: ./
+    links:
+      - db
   db:
     build: ./database/
     ports:
-      - "5432:5432"
+      - 5432:5432
+    restart: always
+    volumes:
+      - database_data:/Users/kavitachaudhary/Desktop/kavita_starwars/poster-kata/database/postgresql/data
+volumes:
+  database_data:
+    driver: local
